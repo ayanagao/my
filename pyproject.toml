@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "box-remaining"
+version = "0.1.0"
+description = "Track what is in your boxes and how much room is left."
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+box = "box_remaining.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
