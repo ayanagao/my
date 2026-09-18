@@ -143,6 +143,8 @@
   /* ---------- result ---------- */
   .result { background:var(--teal-soft); border:1.5px solid var(--teal); border-radius:14px; padding:16px; margin-top:14px; }
   .result h3 { font-size:15px; font-weight:900; color:var(--teal); }
+  .formLink { background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:18px 16px; }
+  .formLink p { font-size:13px; color:var(--ink-soft); line-height:1.8; }
   .result .rnote { font-size:12.5px; line-height:1.8; margin-top:6px; }
   .result .rnote b { color:var(--teal); }
   .result .btn { margin-top:12px; }
@@ -202,7 +204,7 @@
       <div class="list">
         <span>立地・最寄り</span><span>坪数・席数</span><span>スタッフ体制</span><span>家賃・利益</span><span>顧客数・リピート率</span><span>譲渡理由</span><span>引き継ぎ条件</span>
       </div>
-      <a class="btn" id="askGeneral" href="https://www.threads.com/@nailsalon_support" target="_blank" rel="noopener">Threadsで問い合わせる</a>
+      <a class="btn" id="askGeneral" href="#register">問い合わせる</a>
     </div>
   </section>
 
@@ -213,11 +215,7 @@
     </div>
     <div class="rule"></div>
 
-    <div class="steps">
-      <div class="step"><span class="n">1</span><b>入力する</b><span class="sub">このページで</span></div>
-      <div class="step"><span class="n">2</span><b>コピーする</b><span class="sub">ボタン1つ</span></div>
-      <div class="step"><span class="n">3</span><b>貼って送る</b><span class="sub">Threadsで</span></div>
-    </div>
+    <div class="steps" id="steps"></div>
 
     <form id="regForm" novalidate>
       <div class="field" id="f-email">
@@ -276,17 +274,22 @@
       <button class="btn coral" type="submit">入力内容を確認する</button>
 
       <p class="formnote">
-        このページから直接は送信されません。入力内容をまとめた文章ができるので、次の画面のボタンからThreadsに貼って送ってください。<br>
+        <span id="formNote"></span><br>
         内容を確認したうえで、掲載する案件を選んでいます。すべてが掲載されるわけではありません。
       </p>
     </form>
 
+    <div class="formLink" id="formLink" hidden>
+      <p>下のボタンから入力してください。メール・電話・店舗URL・県・年商・希望金額をうかがいます。</p>
+      <a class="btn coral" id="formBtn" href="#" target="_blank" rel="noopener">登録フォームを開く</a>
+    </div>
+
     <div class="result" id="result" hidden>
       <h3 id="resultTitle">この内容で送れます</h3>
-      <p class="rnote">下のボタンを押すと、この文章をコピーしてThreadsが開きます。あとは<b>DMかコメントに貼りつけて送るだけ</b>です。</p>
+      <p class="rnote" id="rnote"></p>
       <textarea id="output" readonly aria-label="送る内容"></textarea>
-      <a class="btn" id="sendBtn" href="https://www.threads.com/@nailsalon_support" target="_blank" rel="noopener">コピーしてThreadsを開く</a>
-      <p class="copied" id="copied" hidden>コピーしました。Threadsで貼りつけて送ってください。</p>
+      <a class="btn" id="sendBtn" href="#">送る</a>
+      <p class="copied" id="copied" hidden></p>
       <button class="linkish" type="button" id="copyOnly">コピーだけする</button>
     </div>
   </section>
@@ -309,7 +312,16 @@
      sales / price は「万円」単位の数字
      ========================================================= */
   var UPDATED = "2026.09.17";
-  var THREADS = "https://www.threads.com/@nailsalon_support";
+  // 問い合わせの受け口。kind と value の2行を変えるだけで切り替わります。
+  //   "email"     … メールアプリが件名・本文入りで開く。コピー不要（一番かんたん）
+  //   "line"      … 公式LINEの友だち追加へ。文章はコピーされる
+  //   "instagram" … InstagramのDMへ。文章はコピーされる
+  //   "threads"   … Threadsのプロフィールへ。文章はコピーされる
+  //   "form"      … Googleフォーム等へ。ページ内フォームの代わりにボタン1つになる
+  var CONTACT = {
+    kind: "threads",
+    value: "nailsalon_support"   // email=アドレス / line・form=URL / instagram・threads=@なしのID
+  };
   var IS_SAMPLE = true;   // 実案件に差し替えたら false にする
 
   var LISTINGS = [
@@ -331,6 +343,41 @@
     talk: { cls: "talk", label: "商談中" },
     done: { cls: "done", label: "成約済み" }
   };
+
+  var CHANNELS = {
+    email: {
+      name: "メール", open: "メールを送る", where: "メールで",
+      url: function (v) { return "mailto:" + v; },
+      prefill: true          // 件名と本文を持たせられる = コピーが要らない
+    },
+    line: {
+      name: "公式LINE", open: "LINEを開く", where: "LINEで",
+      url: function (v) { return v; }
+    },
+    instagram: {
+      name: "Instagram", open: "Instagramを開く", where: "InstagramのDMで",
+      url: function (v) { return "https://ig.me/m/" + v; }
+    },
+    threads: {
+      name: "Threads", open: "Threadsを開く", where: "Threadsで",
+      url: function (v) { return "https://www.threads.com/@" + v; }
+    },
+    form: {
+      name: "登録フォーム", open: "フォームを開く", where: "フォームで",
+      url: function (v) { return v; },
+      external: true         // ページ内フォームを使わず、外部フォームに任せる
+    }
+  };
+  var CH = CHANNELS[CONTACT.kind] || CHANNELS.threads;
+  var CONTACT_URL = CH.url(CONTACT.value);
+
+  // mailto は件名と本文を載せられるので、コピーせずそのまま送信できる。
+  function contactHref(subject, body) {
+    if (!CH.prefill || !subject) return CONTACT_URL;
+    return CONTACT_URL +
+      "?subject=" + encodeURIComponent(subject) +
+      "&body=" + encodeURIComponent(body);
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   var man = function (n) { return Number(n).toLocaleString("ja-JP") + "万円"; };
@@ -412,7 +459,7 @@
       "お名前：\n" +
       "ご連絡先：\n" +
       "ご質問：";
-    showResult(text);
+    showResult(text, "【案件のお問い合わせ】No." + x.no);
   }
 
   /* ---------- 登録フォーム ---------- */
@@ -480,11 +527,13 @@
     return lines.join("\n");
   }
 
-  function showResult(text) {
+  function showResult(text, subject) {
     var r = $("result");
     $("output").value = text;
     $("copied").hidden = true;
-    $("sendBtn").textContent = "コピーしてThreadsを開く";
+    $("sendBtn").href = contactHref(subject, text);
+    $("sendBtn").textContent = CH.prefill ? CH.open : ("コピーして" + CH.open);
+    $("copyOnly").hidden = !!CH.prefill;   // メールは本文が入って開くのでコピー不要
     r.hidden = false;
     r.scrollIntoView({ block: "start", behavior: "smooth" });
   }
@@ -510,7 +559,7 @@
   }
   function copied() {
     var c = $("copied");
-    c.textContent = "コピーしました。Threadsで貼りつけて送ってください。";
+    c.textContent = "コピーしました。" + CH.where + "貼りつけて送ってください。";
     c.style.color = "";
     c.hidden = false;
   }
@@ -534,14 +583,47 @@
 
   $("updated").textContent = UPDATED;
   $("sampleNotice").hidden = !IS_SAMPLE;
-  $("askGeneral").href = THREADS;
-  $("sendBtn").href = THREADS;
+  // ---- 受け口に合わせて文言とリンクを組み立てる ----
+  var steps = CH.prefill
+    ? [["入力する", "このページで"], ["内容を確認", "そのまま"], ["送信を押す", CH.where]]
+    : [["入力する", "このページで"], ["コピーする", "ボタン1つ"], ["貼って送る", CH.where]];
+  steps.forEach(function (st, i) {
+    var d = document.createElement("div");
+    d.className = "step";
+    var n = document.createElement("span"); n.className = "n"; n.textContent = i + 1;
+    var b = document.createElement("b"); b.textContent = st[0];
+    var sub = document.createElement("span"); sub.className = "sub"; sub.textContent = st[1];
+    d.appendChild(n); d.appendChild(b); d.appendChild(sub);
+    $("steps").appendChild(d);
+  });
+
+  $("formNote").textContent = CH.prefill
+    ? "入力内容がそのまま入ったメールが開くので、送信を押すだけです。"
+    : "このページから直接は送信されません。入力内容をまとめた文章ができるので、次の画面のボタンから" + CH.where + "貼って送ってください。";
+
+  $("rnote").textContent = CH.prefill
+    ? "下のボタンを押すと、この内容が入ったメールが開きます。あとは送信を押すだけです。"
+    : "下のボタンを押すと、この文章をコピーして" + CH.name + "が開きます。あとは貼りつけて送るだけです。";
+
+  $("askGeneral").textContent = CH.external ? "登録フォームを開く" : (CH.name + "で問い合わせる");
+  $("askGeneral").href = CONTACT_URL;
+  if (!CH.prefill) { $("askGeneral").target = "_blank"; $("askGeneral").rel = "noopener"; }
+  if (!CH.prefill) { $("sendBtn").target = "_blank"; $("sendBtn").rel = "noopener"; }
+
+  if (CH.external) {
+    // 外部フォームに任せる場合、ページ内フォームは出さない
+    $("steps").hidden = true;
+    $("regForm").hidden = true;
+    $("formLink").hidden = false;
+    $("formBtn").href = CONTACT_URL;
+  }
 
   $("showClosed").addEventListener("change", render);
-  // リンクの既定動作は止めない。コピーしてからThreadsが開く。
+  // リンクの既定動作は止めない。コピーしてから相手のアプリが開く。
   $("sendBtn").addEventListener("click", function () {
+    if (CH.prefill) return;   // メールは本文が入って開くのでコピー不要
     copyOut();
-    $("sendBtn").textContent = "Threadsを開いています…";
+    $("sendBtn").textContent = CH.open + "しています…";
   });
   $("copyOnly").addEventListener("click", copyOut);
   $("regForm").addEventListener("input", saveDraft);
@@ -549,7 +631,7 @@
     ev.preventDefault();
     if (!validate()) return;
     saveDraft();
-    showResult(buildText());
+    showResult(buildText(), "【売り案件の登録】" + $("pref").value);
   });
 
   loadDraft();
